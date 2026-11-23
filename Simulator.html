@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rent vs. Buy Decision Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js for Data Visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        },
+                        emerald: {
+                            500: '#10b981',
+                            600: '#059669',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Slider Styling for tactile responsiveness */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+            transition: transform 0.1s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 999px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        /* D3 Chart Tooltip */
+        .chart-tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(15, 23, 42, 0.95);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            transition: opacity 0.15s ease;
+            z-index: 50;
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Header Section -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold tracking-wide uppercase mb-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-600 animate-pulse"></span>
+                    Interactive Financial Model
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Rent vs. Buy Wealth Simulator</h1>
+                <p class="text-slate-500 text-sm sm:text-base mt-1">Adjust key market and lifestyle variables to see which housing path builds greater net worth over time.</p>
+            </div>
+            
+            <!-- Preset Scenario Buttons -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-medium text-slate-400 mr-1">Presets:</span>
+                <button onclick="applyPreset('balanced')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-slate-200 hover:border-brand-500 hover:text-brand-600 shadow-sm transition">Balanced Market</button>
+                <button onclick="applyPreset('highRates')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-slate-200 hover:border-brand-500 hover:text-brand-600 shadow-sm transition">High Mortgage Rates</button>
+                <button onclick="applyPreset('techHub')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-slate-200 hover:border-brand-500 hover:text-brand-600 shadow-sm transition">Expensive City</button>
+            </div>
+        </header>
+
+        <!-- Main Grid: Controls on Left, Visualization & Results on Right -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- LEFT COLUMN: Interactive Sliders & Toggles (4 cols on lg) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <h2 class="text-lg font-semibold text-slate-900 mb-5 flex items-center justify-between">
+                        <span>Key Decision Variables</span>
+                        <button onclick="resetDefaults()" class="text-xs font-medium text-brand-600 hover:text-brand-700 underline">Reset</button>
+                    </h2>
+
+                    <div class="space-y-6">
+                        <!-- Variable 1: Target Home Price -->
+                        <div>
+                            <div class="flex justify-between items-baseline mb-2">
+                                <label for="homePriceSlider" class="text-sm font-medium text-slate-700">Target Home Price</label>
+                                <span id="homePriceVal" class="text-base font-bold text-brand-600 tabular-nums">$450,000</span>
+                            </div>
+                            <input type="range" id="homePriceSlider" min="150000" max="1500000" step="10000" value="450000">
+                            <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                <span>$150k</span>
+                                <span>$800k</span>
+                                <span>$1.5M</span>
+                            </div>
+                        </div>
+
+                        <!-- Variable 2: Monthly Rent -->
+                        <div>
+                            <div class="flex justify-between items-baseline mb-2">
+                                <label for="monthlyRentSlider" class="text-sm font-medium text-slate-700">Comparable Monthly Rent</label>
+                                <span id="monthlyRentVal" class="text-base font-bold text-emerald-600 tabular-nums">$2,400</span>
+                            </div>
+                            <input type="range" id="monthlyRentSlider" min="800" max="8000" step="50" value="2400">
+                            <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                <span>$800/mo</span>
+                                <span>$4,400/mo</span>
+                                <span>$8,000/mo</span>
+                            </div>
+                        </div>
+
+                        <!-- Variable 3: Time Horizon (Years) -->
+                        <div>
+                            <div class="flex justify-between items-baseline mb-2">
+                                <label for="yearsSlider" class="text-sm font-medium text-slate-700">Time Horizon (Stay Duration)</label>
+                                <span id="yearsVal" class="text-base font-bold text-slate-800 tabular-nums">10 Years</span>
+                            </div>
+                            <input type="range" id="yearsSlider" min="2" max="30" step="1" value="10">
+                            <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                <span>2 yrs</span>
+                                <span>15 yrs</span>
+                                <span>30 yrs</span>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100">
+
+                        <!-- Variable 4: Mortgage Interest Rate -->
+                        <div>
+                            <div class="flex justify-between items-baseline mb-2">
+                                <label for="mortgageRateSlider" class="text-sm font-medium text-slate-700">Mortgage Interest Rate</label>
+                                <span id="mortgageRateVal" class="text-sm font-semibold text-slate-700 tabular-nums">6.5%</span>
+                            </div>
+                            <input type="range" id="mortgageRateSlider" min="2.5" max="10.0" step="0.1" value="6.5">
+                        </div>
+
+                        <!-- Variable 5: Stock Market Return (Opportunity Cost) -->
+                        <div>
+                            <div class="flex justify-between items-baseline mb-2">
+                                <label for="marketReturnSlider" class="text-sm font-medium text-slate-700">Stock Market Return (If Renting)</label>
+                                <span id="marketReturnVal" class="text-sm font-semibold text-slate-700 tabular-nums">8.0%</span>
+                            </div>
+                            <input type="range" id="marketReturnSlider" min="3.0" max="12.0" step="0.5" value="8.0">
+                            <p class="text-[11px] text-slate-400 mt-1">Assumes renter invests down payment & monthly savings.</p>
+                        </div>
+
+                        <!-- Toggle: Down Payment Percentage -->
+                        <div class="pt-2">
+                            <span class="block text-sm font-medium text-slate-700 mb-2">Down Payment</span>
+                            <div class="grid grid-cols-3 gap-2" id="downPaymentGroup">
+                                <button type="button" data-dp="0.10" class="dp-btn py-2 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition">10%</button>
+                                <button type="button" data-dp="0.20" class="dp-btn py-2 px-3 rounded-xl text-xs font-semibold border border-brand-600 bg-brand-50 text-brand-700 transition">20%</button>
+                                <button type="button" data-dp="0.30" class="dp-btn py-2 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition">30%</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assumptions Card -->
+                <div class="bg-slate-100/80 rounded-2xl p-5 border border-slate-200/60 text-xs text-slate-600 space-y-2">
+                    <div class="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Model Baseline Assumptions
+                    </div>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-500">
+                        <li>Home appreciation: <strong>3.5% / yr</strong> | Rent inflation: <strong>3.0% / yr</strong></li>
+                        <li>Property tax & maintenance: <strong>2.2% of home value / yr</strong></li>
+                        <li>Closing costs: <strong>3% buying</strong>, <strong>6% selling</strong></li>
+                        <li>Renter invests initial down payment + any monthly cash flow savings into index funds.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Verdict Banner, KPI Cards & D3 Visualization (8 cols on lg) -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Dynamic Winner Banner -->
+                <div id="verdictBanner" class="rounded-2xl p-6 text-white shadow-md transition-colors duration-300 bg-gradient-to-r from-brand-600 to-indigo-700">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-wider text-indigo-100 mb-1" id="verdictSubtitle">Recommended Path</div>
+                            <h2 class="text-2xl sm:text-3xl font-bold" id="verdictTitle">Buying wins by $64,200</h2>
+                            <p class="text-sm text-indigo-100 mt-1" id="verdictDesc">After 10 years, home equity outweighs upfront closing costs and interest.</p>
+                        </div>
+                        <div class="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 text-right shrink-0 border border-white/20">
+                            <div class="text-xs text-indigo-100">Breakeven Point</div>
+                            <div class="text-xl font-bold tabular-nums" id="breakevenDisplay">Year 5</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Side-by-Side Comparison Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- BUY CARD -->
+                    <div id="buyCard" class="bg-white rounded-2xl p-5 border-2 border-brand-500 shadow-sm transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-brand-600"></span>
+                                <h3 class="font-bold text-slate-900">Path A: Buy Home</h3>
+                            </div>
+                            <span id="buyWinnerBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-700">Winner</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="text-xs text-slate-500">Projected Net Wealth (Year <span class="horizon-label">10</span>)</div>
+                                <div class="text-2xl font-bold text-slate-900 tabular-nums" id="buyNetWealth">$312,400</div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                                <div>
+                                    <span class="text-slate-400 block">Initial Cash Needed</span>
+                                    <span class="font-semibold text-slate-700 tabular-nums" id="buyUpfrontCash">$103,500</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block">Yr 1 Monthly Outflow</span>
+                                    <span class="font-semibold text-slate-700 tabular-nums" id="buyMonthlyCost">$3,100/mo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RENT CARD -->
+                    <div id="rentCard" class="bg-white rounded-2xl p-5 border-2 border-transparent shadow-sm transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                <h3 class="font-bold text-slate-900">Path B: Rent & Invest</h3>
+                            </div>
+                            <span id="rentWinnerBadge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Winner</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="text-xs text-slate-500">Projected Investment Portfolio (Year <span class="horizon-label">10</span>)</div>
+                                <div class="text-2xl font-bold text-slate-900 tabular-nums" id="rentNetWealth">$248,200</div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                                <div>
+                                    <span class="text-slate-400 block">Initial Invested Seed</span>
+                                    <span class="font-semibold text-slate-700 tabular-nums" id="rentUpfrontCash">$103,500</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block">Yr 1 Monthly Rent</span>
+                                    <span class="font-semibold text-slate-700 tabular-nums" id="rentMonthlyCost">$2,400/mo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive D3 Chart Container -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Net Wealth Trajectory Over Time</h3>
+                            <p class="text-xs text-slate-500">Hover or tap anywhere on the chart to inspect year-by-year net worth.</p>
+                        </div>
+                        <!-- Legend -->
+                        <div class="flex items-center gap-4 text-xs font-medium">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded-sm bg-brand-600"></span>
+                                <span class="text-slate-700">Buy Net Equity</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded-sm bg-emerald-500"></span>
+                                <span class="text-slate-700">Rent Portfolio</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Responsive SVG Wrapper -->
+                    <div id="chartContainer" class="relative w-full h-[320px] sm:h-[360px]">
+                        <div id="tooltip" class="chart-tooltip opacity-0"></div>
+                    </div>
+                </div>
+
+                <!-- Monthly Cash Flow Breakdown Bar -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <h3 class="text-sm font-bold text-slate-900 mb-3">Year 1 Monthly Outflow Comparison</h3>
+                    <div class="space-y-4">
+                        <!-- Buy Bar -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-medium text-slate-700">Buying (Mortgage P&I + Tax + Maintenance)</span>
+                                <span class="font-bold text-brand-600 tabular-nums" id="barBuyLabel">$3,100 / mo</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                <div id="barBuyFill" class="bg-brand-600 h-3 rounded-full transition-all duration-300" style="width: 75%"></div>
+                            </div>
+                        </div>
+                        <!-- Rent Bar -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-medium text-slate-700">Renting (Monthly Rent Payment)</span>
+                                <span class="font-bold text-emerald-600 tabular-nums" id="barRentLabel">$2,400 / mo</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                <div id="barRentFill" class="bg-emerald-500 h-3 rounded-full transition-all duration-300" style="width: 58%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="cashflowNote" class="text-xs text-slate-500 mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        In Year 1, renting saves <strong>$700/mo</strong> in cash flow, which gets invested into the stock market.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Rent vs. Buy Financial Simulation Engine & D3 Visualization
+         */
+
+        // State object holding all user-adjustable inputs
+        const state = {
+            homePrice: 450000,
+            monthlyRent: 2400,
+            years: 10,
+            mortgageRate: 6.5,
+            marketReturn: 8.0,
+            downPaymentPct: 0.20
+        };
+
+        // Fixed economic constants for realistic modeling
+        const CONSTANTS = {
+            homeAppreciation: 0.035, // 3.5% annual home value growth
+            rentInflation: 0.030,    // 3.0% annual rent increase
+            propTaxAndMaint: 0.022,  // 2.2% of home value per year (taxes, insurance, repairs)
+            buyingClosingCost: 0.03, // 3% upfront closing costs
+            sellingClosingCost: 0.06 // 6% realtor & closing fees when selling
+        };
+
+        // Formatting helpers
+        const formatCurrency = (val) => {
+            const absVal = Math.abs(val);
+            const sign = val < 0 ? '-' : '';
+            if (absVal >= 1000000) {
+                return sign + '$' + (absVal / 1000000).toFixed(2) + 'M';
+            }
+            return sign + '$' + Math.round(absVal).toLocaleString('en-US');
+        };
+
+        const formatExactCurrency = (val) => {
+            const sign = val < 0 ? '-' : '';
+            return sign + '$' + Math.round(Math.abs(val)).toLocaleString('en-US');
+        };
+
+        /**
+         * Core quantitative model calculating year-by-year net worth for Buying vs. Renting
+         */
+        function runSimulation() {
+            const { homePrice, monthlyRent, years, mortgageRate, marketReturn, downPaymentPct } = state;
+
+            const downPayment = homePrice * downPaymentPct;
+            const buyClosing = homePrice * CONSTANTS.buyingClosingCost;
+            const totalInitialCash = downPayment + buyClosing;
+
+            // Mortgage loan details (30-year fixed)
+            const loanAmount = homePrice - downPayment;
+            const monthlyRate = (mortgageRate / 100) / 12;
+            const totalPayments = 30 * 12;
+
+            // Standard amortization formula: M = P [ i(1 + i)^n ] / [ (1 + i)^n - 1 ]
+            const monthlyMortgagePI = monthlyRate > 0
+                ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1)
+                : loanAmount / totalPayments;
+
+            // Year 1 monthly costs
+            const yr1MonthlyTaxMaint = (homePrice * CONSTANTS.propTaxAndMaint) / 12;
+            const yr1TotalBuyMonthly = monthlyMortgagePI + yr1MonthlyTaxMaint;
+
+            // Simulation trackers
+            let currentHomeValue = homePrice;
+            let remainingLoan = loanAmount;
+            let currentAnnualRent = monthlyRent * 12;
+
+            // Renter starts by investing the exact same upfront cash the buyer spent
+            let renterPortfolio = totalInitialCash;
+            const annualMarketReturn = marketReturn / 100;
+
+            const timeline = [];
+            let breakevenYear = null;
+
+            // Year 0 starting point
+            timeline.push({
+                year: 0,
+                buyNetWorth: downPayment - (homePrice * CONSTANTS.sellingClosingCost), // Immediate resale loss due to transaction fees
+                rentNetWorth: renterPortfolio,
+                homeValue: homePrice,
+                loanBalance: loanAmount
+            });
+
+            for (let yr = 1; yr <= years; yr++) {
+                // 1. Simulate 12 months of mortgage amortization
+                let annualMortgagePaid = 0;
+                for (let m = 0; m < 12; m++) {
+                    if (remainingLoan > 0) {
+                        const interestPayment = remainingLoan * monthlyRate;
+                        const principalPayment = Math.min(remainingLoan, monthlyMortgagePI - interestPayment);
+                        remainingLoan -= principalPayment;
+                        annualMortgagePaid += (interestPayment + principalPayment);
+                    }
+                }
+
+                // 2. Annual property tax & maintenance scales with home value
+                const annualTaxMaint = currentHomeValue * CONSTANTS.propTaxAndMaint;
+                const totalBuyAnnualOutflow = annualMortgagePaid + annualTaxMaint;
+
+                // 3. Renter pays annual rent; difference in cash flow is invested (or withdrawn if rent > buy)
+                const annualSavingsForRenter = totalBuyAnnualOutflow - currentAnnualRent;
+
+                // Grow renter portfolio (mid-year contribution approximation)
+                renterPortfolio = renterPortfolio * (1 + annualMarketReturn) + annualSavingsForRenter * (1 + annualMarketReturn / 2);
+
+                // 4. Appreciate home & inflate rent for end of year
+                currentHomeValue *= (1 + CONSTANTS.homeAppreciation);
+                currentAnnualRent *= (1 + CONSTANTS.rentInflation);
+
+                // 5. Net Equity if buyer sells at end of this year
+                const sellingCosts = currentHomeValue * CONSTANTS.sellingClosingCost;
+                const buyNetWorth = currentHomeValue - remainingLoan - sellingCosts;
+
+                if (breakevenYear === null && buyNetWorth >= renterPortfolio) {
+                    breakevenYear = yr;
+                }
+
+                timeline.push({
+                    year: yr,
+                    buyNetWorth: Math.round(buyNetWorth),
+                    rentNetWorth: Math.round(renterPortfolio),
+                    homeValue: Math.round(currentHomeValue),
+                    loanBalance: Math.round(remainingLoan)
+                });
+            }
+
+            return {
+                timeline,
+                finalBuy: timeline[timeline.length - 1].buyNetWorth,
+                finalRent: timeline[timeline.length - 1].rentNetWorth,
+                totalInitialCash,
+                yr1TotalBuyMonthly,
+                yr1MonthlyRent: monthlyRent,
+                breakevenYear
+            };
+        }
+
+        /**
+         * Updates all DOM elements, KPI cards, banners, and triggers D3 chart redraw
+         */
+        function updateUI() {
+            // Update slider labels
+            document.getElementById('homePriceVal').textContent = formatExactCurrency(state.homePrice);
+            document.getElementById('monthlyRentVal').textContent = formatExactCurrency(state.monthlyRent);
+            document.getElementById('yearsVal').textContent = `${state.years} Year${state.years > 1 ? 's' : ''}`;
+            document.getElementById('mortgageRateVal').textContent = `${state.mortgageRate.toFixed(1)}%`;
+            document.getElementById('marketReturnVal').textContent = `${state.marketReturn.toFixed(1)}%`;
+
+            document.querySelectorAll('.horizon-label').forEach(el => el.textContent = state.years);
+
+            // Run math model
+            const results = runSimulation();
+            const diff = results.finalBuy - results.finalRent;
+            const buyWins = diff >= 0;
+
+            // Update Verdict Banner
+            const banner = document.getElementById('verdictBanner');
+            const title = document.getElementById('verdictTitle');
+            const desc = document.getElementById('verdictDesc');
+            const breakevenEl = document.getElementById('breakevenDisplay');
+
+            if (buyWins) {
+                banner.className = "rounded-2xl p-6 text-white shadow-md transition-all duration-300 bg-gradient-to-r from-brand-600 to-indigo-700";
+                title.textContent = `Buying wins by ${formatExactCurrency(diff)}`;
+                desc.textContent = `After ${state.years} years, home equity outpaces stock market returns on rented savings.`;
+            } else {
+                banner.className = "rounded-2xl p-6 text-white shadow-md transition-all duration-300 bg-gradient-to-r from-emerald-600 to-teal-700";
+                title.textContent = `Renting wins by ${formatExactCurrency(Math.abs(diff))}`;
+                desc.textContent = `Investing the down payment & monthly cash savings beats home appreciation over ${state.years} years.`;
+            }
+
+            breakevenEl.textContent = results.breakevenYear ? `Year ${results.breakevenYear}` : `> ${state.years} Yrs`;
+
+            // Update Side-by-Side Cards
+            document.getElementById('buyNetWealth').textContent = formatExactCurrency(results.finalBuy);
+            document.getElementById('buyUpfrontCash').textContent = formatExactCurrency(results.totalInitialCash);
+            document.getElementById('buyMonthlyCost').textContent = `${formatExactCurrency(results.yr1TotalBuyMonthly)}/mo`;
+
+            document.getElementById('rentNetWealth').textContent = formatExactCurrency(results.finalRent);
+            document.getElementById('rentUpfrontCash').textContent = formatExactCurrency(results.totalInitialCash);
+            document.getElementById('rentMonthlyCost').textContent = `${formatExactCurrency(results.yr1MonthlyRent)}/mo`;
+
+            // Highlight winning card
+            const buyCard = document.getElementById('buyCard');
+            const rentCard = document.getElementById('rentCard');
+            const buyBadge = document.getElementById('buyWinnerBadge');
+            const rentBadge = document.getElementById('rentWinnerBadge');
+
+            if (buyWins) {
+                buyCard.classList.add('border-brand-500', 'ring-2', 'ring-brand-500/10');
+                buyCard.classList.remove('border-transparent');
+                rentCard.classList.remove('border-emerald-500', 'ring-2', 'ring-emerald-500/10');
+                rentCard.classList.add('border-transparent');
+                buyBadge.classList.remove('hidden');
+                rentBadge.classList.add('hidden');
+            } else {
+                rentCard.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-500/10');
+                rentCard.classList.remove('border-transparent');
+                buyCard.classList.remove('border-brand-500', 'ring-2', 'ring-brand-500/10');
+                buyCard.classList.add('border-transparent');
+                rentBadge.classList.remove('hidden');
+                buyBadge.classList.add('hidden');
+            }
+
+            // Update Year 1 Cash Flow Bars
+            const maxMonthly = Math.max(results.yr1TotalBuyMonthly, results.yr1MonthlyRent, 1);
+            const buyPct = Math.min(100, (results.yr1TotalBuyMonthly / maxMonthly) * 100);
+            const rentPct = Math.min(100, (results.yr1MonthlyRent / maxMonthly) * 100);
+
+            document.getElementById('barBuyLabel').textContent = `${formatExactCurrency(results.yr1TotalBuyMonthly)} / mo`;
+            document.getElementById('barRentLabel').textContent = `${formatExactCurrency(results.yr1MonthlyRent)} / mo`;
+            document.getElementById('barBuyFill').style.width = `${buyPct}%`;
+            document.getElementById('barRentFill').style.width = `${rentPct}%`;
+
+            const monthlyDiff = results.yr1TotalBuyMonthly - results.yr1MonthlyRent;
+            const cashflowNote = document.getElementById('cashflowNote');
+            if (monthlyDiff > 0) {
+                cashflowNote.innerHTML = `In Year 1, renting saves <strong>${formatExactCurrency(monthlyDiff)}/mo</strong> in cash flow, which gets invested into the stock market.`;
+            } else if (monthlyDiff < 0) {
+                cashflowNote.innerHTML = `In Year 1, buying is actually <strong>${formatExactCurrency(Math.abs(monthlyDiff))}/mo cheaper</strong> than renting, accelerating home wealth.`;
+            } else {
+                cashflowNote.innerHTML = `In Year 1, monthly out-of-pocket costs are virtually identical between renting and buying.`;
+            }
+
+            // Draw D3 Chart
+            renderChart(results.timeline);
+        }
+
+        /**
+         * Renders responsive D3.js dual-line wealth comparison chart
+         */
+        function renderChart(data) {
+            const container = document.getElementById('chartContainer');
+            const tooltip = document.getElementById('tooltip');
+
+            // Clear previous SVG
+            d3.select(container).selectAll('svg').remove();
+
+            const rect = container.getBoundingClientRect();
+            const width = rect.width || 600;
+            const height = rect.height || 340;
+            const margin = { top: 20, right: 24, bottom: 36, left: 64 };
+            const innerWidth = Math.max(100, width - margin.left - margin.right);
+            const innerHeight = Math.max(100, height - margin.top - margin.bottom);
+
+            const svg = d3.select(container)
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height)
+                .attr('class', 'overflow-visible');
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Scales
+            const xScale = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.year)])
+                .range([0, innerWidth]);
+
+            const yMin = Math.min(0, d3.min(data, d => Math.min(d.buyNetWorth, d.rentNetWorth)));
+            const yMax = d3.max(data, d => Math.max(d.buyNetWorth, d.rentNetWorth)) * 1.08;
+
+            const yScale = d3.scaleLinear()
+                .domain([yMin, yMax])
+                .range([innerHeight, 0]);
+
+            // Horizontal Gridlines
+            g.append('g')
+                .attr('class', 'grid')
+                .call(d3.axisLeft(yScale)
+                    .ticks(5)
+                    .tickSize(-innerWidth)
+                    .tickFormat('')
+                )
+                .selectAll('line')
+                .attr('stroke', '#f1f5f9')
+                .attr('stroke-dasharray', '3,3');
+
+            g.selectAll('.domain').remove();
+
+            // Zero baseline if negative equity exists in Year 0
+            if (yMin < 0) {
+                g.append('line')
+                    .attr('x1', 0)
+                    .attr('x2', innerWidth)
+                    .attr('y1', yScale(0))
+                    .attr('y2', yScale(0))
+                    .attr('stroke', '#cbd5e1')
+                    .attr('stroke-width', 1.5);
+            }
+
+            // Axes
+            const xAxis = d3.axisBottom(xScale)
+                .ticks(Math.min(data.length, 8))
+                .tickFormat(d => `Yr ${d}`);
+
+            const yAxis = d3.axisLeft(yScale)
+                .ticks(5)
+                .tickFormat(d => formatCurrency(d));
+
+            g.append('g')
+                .attr('transform', `translate(0,${innerHeight})`)
+                .call(xAxis)
+                .attr('color', '#64748b')
+                .attr('font-size', '11px')
+                .select('.domain').attr('stroke', '#e2e8f0');
+
+            g.append('g')
+                .call(yAxis)
+                .attr('color', '#64748b')
+                .attr('font-size', '11px')
+                .select('.domain').remove();
+
+            // Area Gradients
+            const defs = svg.append('defs');
+
+            const buyGrad = defs.append('linearGradient')
+                .attr('id', 'buyAreaGrad')
+                .attr('x1', '0%').attr('y1', '0%')
+                .attr('x2', '0%').attr('y2', '100%');
+            buyGrad.append('stop').attr('offset', '0%').attr('stop-color', '#4f46e5').attr('stop-opacity', 0.18);
+            buyGrad.append('stop').attr('offset', '100%').attr('stop-color', '#4f46e5').attr('stop-opacity', 0.0);
+
+            const rentGrad = defs.append('linearGradient')
+                .attr('id', 'rentAreaGrad')
+                .attr('x1', '0%').attr('y1', '0%')
+                .attr('x2', '0%').attr('y2', '100%');
+            rentGrad.append('stop').attr('offset', '0%').attr('stop-color', '#10b981').attr('stop-opacity', 0.15);
+            rentGrad.append('stop').attr('offset', '100%').attr('stop-color', '#10b981').attr('stop-opacity', 0.0);
+
+            // Area generators
+            const areaBuy = d3.area()
+                .x(d => xScale(d.year))
+                .y0(yScale(Math.max(0, yMin)))
+                .y1(d => yScale(d.buyNetWorth))
+                .curve(d3.curveMonotoneX);
+
+            const areaRent = d3.area()
+                .x(d => xScale(d.year))
+                .y0(yScale(Math.max(0, yMin)))
+                .y1(d => yScale(d.rentNetWorth))
+                .curve(d3.curveMonotoneX);
+
+            g.append('path')
+                .datum(data)
+                .attr('fill', 'url(#buyAreaGrad)')
+                .attr('d', areaBuy);
+
+            g.append('path')
+                .datum(data)
+                .attr('fill', 'url(#rentAreaGrad)')
+                .attr('d', areaRent);
+
+            // Line generators
+            const lineBuy = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScale(d.buyNetWorth))
+                .curve(d3.curveMonotoneX);
+
+            const lineRent = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScale(d.rentNetWorth))
+                .curve(d3.curveMonotoneX);
+
+            // Draw Rent Line
+            g.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#10b981')
+                .attr('stroke-width', 3)
+                .attr('d', lineRent);
+
+            // Draw Buy Line
+            g.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#4f46e5')
+                .attr('stroke-width', 3)
+                .attr('d', lineBuy);
+
+            // End Dots
+            const lastPoint = data[data.length - 1];
+            g.append('circle')
+                .attr('cx', xScale(lastPoint.year))
+                .attr('cy', yScale(lastPoint.buyNetWorth))
+                .attr('r', 5)
+                .attr('fill', '#4f46e5')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+
+            g.append('circle')
+                .attr('cx', xScale(lastPoint.year))
+                .attr('cy', yScale(lastPoint.rentNetWorth))
+                .attr('r', 5)
+                .attr('fill', '#10b981')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+
+            // Interactive Hover / Touch Overlay
+            const hoverLine = g.append('line')
+                .attr('stroke', '#94a3b8')
+                .attr('stroke-width', 1)
+                .attr('stroke-dasharray', '4,4')
+                .attr('y1', 0)
+                .attr('y2', innerHeight)
+                .style('opacity', 0);
+
+            const hoverDotBuy = g.append('circle')
+                .attr('r', 6)
+                .attr('fill', '#4f46e5')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .style('opacity', 0);
+
+            const hoverDotRent = g.append('circle')
+                .attr('r', 6)
+                .attr('fill', '#10b981')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .style('opacity', 0);
+
+            function handlePointerMove(event) {
+                const [mx] = d3.pointer(event);
+                const rawYear = xScale.invert(mx);
+                const idx = Math.max(0, Math.min(data.length - 1, Math.round(rawYear)));
+                const d = data[idx];
+
+                const cx = xScale(d.year);
+                hoverLine.attr('x1', cx).attr('x2', cx).style('opacity', 1);
+                hoverDotBuy.attr('cx', cx).attr('cy', yScale(d.buyNetWorth)).style('opacity', 1);
+                hoverDotRent.attr('cx', cx).attr('cy', yScale(d.rentNetWorth)).style('opacity', 1);
+
+                const diff = d.buyNetWorth - d.rentNetWorth;
+                const leadText = diff >= 0
+                    ? `<span class="text-indigo-300 font-semibold">Buy leads by ${formatExactCurrency(diff)}</span>`
+                    : `<span class="text-emerald-300 font-semibold">Rent leads by ${formatExactCurrency(Math.abs(diff))}</span>`;
+
+                tooltip.innerHTML = `
+                    <div class="font-bold text-slate-200 border-b border-slate-700 pb-1 mb-1.5">Year ${d.year} Snapshot</div>
+                    <div class="flex items-center justify-between gap-4 mb-1">
+                        <span class="text-indigo-300">● Buy Net Worth:</span>
+                        <span class="font-bold tabular-nums">${formatExactCurrency(d.buyNetWorth)}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 mb-1.5">
+                        <span class="text-emerald-300">● Rent Portfolio:</span>
+                        <span class="font-bold tabular-nums">${formatExactCurrency(d.rentNetWorth)}</span>
+                    </div>
+                    <div class="text-[11px] pt-1 border-t border-slate-700">${leadText}</div>
+                `;
+
+                // Position tooltip cleanly inside container bounds
+                const tooltipX = cx + margin.left > width * 0.65
+                    ? cx + margin.left - 210
+                    : cx + margin.left + 16;
+
+                tooltip.style.left = `${Math.max(8, tooltipX)}px`;
+                tooltip.style.top = `16px`;
+                tooltip.style.opacity = 1;
+            }
+
+            function handlePointerLeave() {
+                hoverLine.style('opacity', 0);
+                hoverDotBuy.style('opacity', 0);
+                hoverDotRent.style('opacity', 0);
+                tooltip.style.opacity = 0;
+            }
+
+            g.append('rect')
+                .attr('width', innerWidth)
+                .attr('height', innerHeight)
+                .attr('fill', 'transparent')
+                .style('cursor', 'crosshair')
+                .on('mousemove touchmove', handlePointerMove)
+                .on('mouseleave touchend', handlePointerLeave);
+        }
+
+        // Bind Input Event Listeners
+        function bindControls() {
+            const sliderMap = [
+                { id: 'homePriceSlider', key: 'homePrice', parser: parseFloat },
+                { id: 'monthlyRentSlider', key: 'monthlyRent', parser: parseFloat },
+                { id: 'yearsSlider', key: 'years', parser: parseInt },
+                { id: 'mortgageRateSlider', key: 'mortgageRate', parser: parseFloat },
+                { id: 'marketReturnSlider', key: 'marketReturn', parser: parseFloat }
+            ];
+
+            sliderMap.forEach(({ id, key, parser }) => {
+                const el = document.getElementById(id);
+                el.addEventListener('input', (e) => {
+                    state[key] = parser(e.target.value);
+                    updateUI();
+                });
+            });
+
+            // Down payment buttons
+            document.querySelectorAll('.dp-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.downPaymentPct = parseFloat(btn.dataset.dp);
+                    syncDownPaymentButtons();
+                    updateUI();
+                });
+            });
+        }
+
+        function syncDownPaymentButtons() {
+            document.querySelectorAll('.dp-btn').forEach(btn => {
+                const isSelected = parseFloat(btn.dataset.dp) === state.downPaymentPct;
+                if (isSelected) {
+                    btn.className = "dp-btn py-2 px-3 rounded-xl text-xs font-semibold border border-brand-600 bg-brand-50 text-brand-700 transition";
+                } else {
+                    btn.className = "dp-btn py-2 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition";
+                }
+            });
+        }
+
+        function syncSlidersToState() {
+            document.getElementById('homePriceSlider').value = state.homePrice;
+            document.getElementById('monthlyRentSlider').value = state.monthlyRent;
+            document.getElementById('yearsSlider').value = state.years;
+            document.getElementById('mortgageRateSlider').value = state.mortgageRate;
+            document.getElementById('marketReturnSlider').value = state.marketReturn;
+            syncDownPaymentButtons();
+            updateUI();
+        }
+
+        // Scenario Presets
+        window.applyPreset = function(type) {
+            if (type === 'balanced') {
+                Object.assign(state, { homePrice: 450000, monthlyRent: 2400, years: 10, mortgageRate: 6.5, marketReturn: 8.0, downPaymentPct: 0.20 });
+            } else if (type === 'highRates') {
+                Object.assign(state, { homePrice: 500000, monthlyRent: 2300, years: 7, mortgageRate: 8.2, marketReturn: 8.5, downPaymentPct: 0.20 });
+            } else if (type === 'techHub') {
+                Object.assign(state, { homePrice: 1100000, monthlyRent: 4200, years: 12, mortgageRate: 6.5, marketReturn: 9.0, downPaymentPct: 0.20 });
+            }
+            syncSlidersToState();
+        };
+
+        window.resetDefaults = function() {
+            window.applyPreset('balanced');
+        };
+
+        // Initialize on load and resize
+        window.addEventListener('DOMContentLoaded', () => {
+            bindControls();
+            updateUI();
+        });
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                updateUI();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
